@@ -7,6 +7,13 @@ import vertexShader from './shaders/vertex.glsl'
 import { TextureLoader } from 'three';
 import { LoadTexture } from './utils';
 import GUI from 'lil-gui';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { Mesh } from 'three';
+import { BoxGeometry } from 'three';
+import { MeshBasicMaterial } from 'three';
+import gsap from 'gsap';
+import { Group } from 'three';
+import { Vector2 } from 'three';
 
 const {PI} = Math
 
@@ -21,13 +28,13 @@ const scene = new THREE.Scene()
 
 const renderer = new THREE.WebGLRenderer({canvas,antialias:true,alpha:true})
 
-// const camera = new THREE.OrthographicCamera(-1,1,1,-1)
-const camera = new THREE.PerspectiveCamera(45,innerWidth/innerHeight,0,1000)
+const camera = new THREE.OrthographicCamera(-1,1,1,-1)
+// const camera = new THREE.PerspectiveCamera(45,innerWidth/innerHeight,0,1000)
 
-camera.position.set(2,2,2)
+const controls = new OrbitControls(camera,canvas)
+
+camera.position.set(7,7,7)
 camera.lookAt(0,0,0)
-
-
 
 
 
@@ -40,42 +47,58 @@ Draco.setDecoderPath('/draco/')
 Draco.setDecoderConfig({type: 'wasm'})
 GLB.setDRACOLoader(Draco)
 
+const Raycaster = new THREE.Raycaster()
+
 
 
 const Images = 5
-const Planes = []
+const Planes = new Group()
+scene.add(Planes)
 
 for(let i = 1; i <= Images; i++){
   const texture = LoadTexture(`/images/${i}.jpg`,Texture)
+  // const material = new THREE.MeshBasicMaterial({
+  //   // color:0x111111,
+  //   map:texture,
+  //   opacity:.4
+  // })
   const material = new THREE.ShaderMaterial({
     fragmentShader,
     vertexShader,
-    transparent:true,
-    opacity:.3,
     uniforms:{
       uTime:{value:0},
       uTexture:{value:texture},
-      uResolution:{value:5}
+      uResolution:{value:3/1000}
     }
   })
   
-  lil.add(material.uniforms.uResolution,'value').min(5).max(1000).name(`Plane - ${i}`)
+  // lil.add(material.uniforms.uResolution,'value').min(0).max(1).name(`Plane - ${i}`)
   
   const Plane = new THREE.Mesh(
-    new THREE.PlaneGeometry(1,1,1),
+    new THREE.PlaneGeometry(.7,.9),
     material
   )
 
-  Planes.push(Plane)
+  Plane.name = 'image-mesh' + i
+  Plane.targetResolution = 3/1000
+
+  Planes.add(Plane)
   Plane.position.z = (i - Images / 2) * .3
-  scene.add(Plane)
   
 }
 
 
 
-
 function Animate(){
+
+  Planes.children.forEach(child => {
+    if(!child.userData.targetResolution) return;
+    // child.material.uniforms.uResolution.value += (child.userData.targetResolution - child.material.uniforms.uResolution.value) * .1
+    // console.log(child.userData.targetResolution)
+  })
+
+
+  controls.update()
   renderer.render(scene,camera)
   requestAnimationFrame(Animate)
 }
@@ -90,5 +113,44 @@ function resize(){
   canvas.height = innerHeight;
   renderer.setSize(innerWidth,innerHeight)
 }
+
+const mouse = new Vector2()
+function mouseMove(e){
+  const x = e.clientX / innerWidth;
+  const y = e.clientY / innerHeight;
+
+  const nx = x * 2 - 1;
+  const ny = -(y * 2 - 1);
+
+  mouse.set(nx,ny)
+
+  Raycaster.setFromCamera(mouse,camera)
+  const intersect = Raycaster.intersectObjects(Planes.children)?.[0]?.object?.name || ''
+
+  Planes.children.forEach(child => {
+    if(child.name == intersect) {
+      // child.userData.targetResolution = 3/1000
+      gsap.to(child.material.uniforms.uResolution,{
+        value:1,
+        ease:'power4.out'
+      })
+    } else {
+      gsap.to(child.material.uniforms.uResolution,{
+        value:3/1000,
+        ease:'power4.in'
+      })
+    }
+  })
+
+
+  gsap.to(Planes.rotation,{
+    y:(2 - x * 1.5) * .3,
+  })
+  gsap.to(camera.position,{
+    y:7 - (1-y) * 6
+  })
+}
+
+window.addEventListener('mousemove',mouseMove)
 
 window.addEventListener('resize',resize)
