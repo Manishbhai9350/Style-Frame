@@ -1,3 +1,4 @@
+import { SRGBColorSpace, TextureLoader } from "three";
 import { PerspectiveCamera, Scene, WebGLRenderer } from "three";
 import { degToRad } from "three/src/math/MathUtils.js";
 
@@ -11,4 +12,8 @@ export function GetSceneBounds(renderer = new WebGLRenderer(),camera = new Persp
     const height = Math.tan(theta) * z * 2;
     const width =  height * aspect;
     return {width,height}
+}
+
+export function LoadTexture(source = '',Loader = new TextureLoader()) {
+    return Loader.load(source,texture => texture.colorSpace =  SRGBColorSpace)
 }
