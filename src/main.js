@@ -8,12 +8,12 @@ import { TextureLoader } from 'three';
 import { LoadTexture } from './utils';
 import GUI from 'lil-gui';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { Mesh } from 'three';
-import { BoxGeometry } from 'three';
-import { MeshBasicMaterial } from 'three';
 import gsap from 'gsap';
 import { Group } from 'three';
-import { Vector2 } from 'three';
+import { projects } from './data.js'
+import { SplitText } from 'gsap/SplitText';
+
+gsap.registerPlugin(SplitText)
 
 const {PI} = Math
 
@@ -37,14 +37,63 @@ const controls = new OrbitControls(camera,canvas)
 camera.position.set(7,7,7)
 camera.lookAt(0,0,0)
 
+const Title = document.querySelector('.projects .title')
+const Description = document.querySelector('.projects .description')
+
+const Titles = []
+const Descriptions = []
+
+function AddContent(){
+  projects.forEach(({title,description},i) => {
+    const h1 = document.createElement('h1')
+    const p = document.createElement('p')
+    h1.textContent = title
+    p.textContent = description
+    Titles.push[h1]
+    Descriptions.push[p]
+    Title.appendChild(h1)
+    Description.appendChild(p)
+
+    new SplitText(h1,{
+      type:['words','lines'],
+      mask:'lines',
+      wordsClass:`heading-words-${i+1}`
+    })
+    new SplitText(p,{
+      type:['words','lines'],
+      mask:'lines',
+      wordsClass:`para-words-${i+1}`
+    })
+
+    gsap.set([`.heading-words-${i+1}`,`.para-words-${i+1}`],{
+      yPercent:100
+    })
+
+
+  })
+}
+AddContent()
+
 let PreviousPlaneIdx = null;
+
+function ShowContent(idx = 0){
+
+  const TL = gsap.timeline()
+
+  if(PreviousPlaneIdx !== null) {
+    TL.to([`.heading-words-${PreviousPlaneIdx+1}`,`.para-words-${PreviousPlaneIdx+1}`],{yPercent:100})
+  }
+  
+  TL.to([`.heading-words-${idx+1}`,`.para-words-${idx+1}`],{yPercent:0,stagger:.01})
+
+}
+
 function StartAnimation(){
 
   const Slide = (nth = 1) => {
     let currentPlaneIdx = nth - 1;
 
     if(PreviousPlaneIdx !== null) {
-      console.log(PreviousPlaneIdx)
       gsap.to(Planes.children[PreviousPlaneIdx].position,{
         y:0
       })
@@ -52,10 +101,14 @@ function StartAnimation(){
         value:0
       })
       gsap.to(indicators[PreviousPlaneIdx].querySelector('.line'),{
+      transformOrigin:'right',
       scaleX:0,
       duration:.3
     })
     }
+
+    ShowContent(nth - 1)
+
     PreviousPlaneIdx = nth - 1
 
     const TL = gsap.timeline()
@@ -67,9 +120,12 @@ function StartAnimation(){
       value:1
     })
 
+
     gsap.to(indicators[nth - 1].querySelector('.line'),{
+      transformOrigin:'left',
       scaleX:1,
       duration:5,
+      ease:'none',
       onComplete(){
         PreviousPlaneIdx = currentPlaneIdx
         currentPlaneIdx++;
@@ -92,7 +148,6 @@ Draco.setDecoderPath('/draco/')
 Draco.setDecoderConfig({type: 'wasm'})
 GLB.setDRACOLoader(Draco)
 
-const Raycaster = new THREE.Raycaster()
 
 
 const nav = document.querySelector('nav')
@@ -100,6 +155,8 @@ const indicators = []
 const Images = 5
 const Planes = new Group()
 scene.add(Planes)
+const aspect = innerWidth / innerHeight
+const scaling = innerWidth < 900 ? 1.5 : 1
 
 for(let i = 1; i <= Images; i++){
   const texture = LoadTexture(`/images/${i}.jpg`,Texture)
@@ -126,9 +183,10 @@ for(let i = 1; i <= Images; i++){
   })
   
   // lil.add(material.uniforms.uResolution,'value').min(0).max(1).name(`Plane - ${i}`)
+
   
   const Plane = new THREE.Mesh(
-    new THREE.PlaneGeometry(.7,.9),
+    new THREE.PlaneGeometry(.7 * scaling,.4 * aspect * scaling),
     material
   )
 
@@ -143,14 +201,6 @@ for(let i = 1; i <= Images; i++){
 
 
 function Animate(){
-
-  Planes.children.forEach(child => {
-    if(!child.userData.targetResolution) return;
-    // child.material.uniforms.uResolution.value += (child.userData.targetResolution - child.material.uniforms.uResolution.value) * .1
-    // console.log(child.userData.targetResolution)
-  })
-
-
   controls.update()
   renderer.render(scene,camera)
   requestAnimationFrame(Animate)
@@ -160,6 +210,7 @@ requestAnimationFrame(Animate)
 
 
 function resize(){
+  window.location.reload()
   camera.aspect = innerWidth/innerHeight
   camera.updateProjectionMatrix()
   canvas.width = innerWidth;
