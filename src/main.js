@@ -20,6 +20,7 @@ const {PI} = Math
 const canvas = document.querySelector('canvas')
 
 const lil = new GUI()
+lil.destroy()
 
 canvas.width = innerWidth;
 canvas.height = innerHeight;
@@ -36,9 +37,53 @@ const controls = new OrbitControls(camera,canvas)
 camera.position.set(7,7,7)
 camera.lookAt(0,0,0)
 
+let PreviousPlaneIdx = null;
+function StartAnimation(){
+
+  const Slide = (nth = 1) => {
+    let currentPlaneIdx = nth - 1;
+
+    if(PreviousPlaneIdx !== null) {
+      console.log(PreviousPlaneIdx)
+      gsap.to(Planes.children[PreviousPlaneIdx].position,{
+        y:0
+      })
+      gsap.to(Planes.children[PreviousPlaneIdx].material.uniforms.uResolution,{
+        value:0
+      })
+      gsap.to(indicators[PreviousPlaneIdx].querySelector('.line'),{
+      scaleX:0,
+      duration:.3
+    })
+    }
+    PreviousPlaneIdx = nth - 1
+
+    const TL = gsap.timeline()
+
+    TL.to(Planes.children[nth - 1].position,{
+      y:.3
+    })
+    TL.to(Planes.children[nth - 1].material.uniforms.uResolution,{
+      value:1
+    })
+
+    gsap.to(indicators[nth - 1].querySelector('.line'),{
+      scaleX:1,
+      duration:5,
+      onComplete(){
+        PreviousPlaneIdx = currentPlaneIdx
+        currentPlaneIdx++;
+        currentPlaneIdx %= Images
+        Slide(currentPlaneIdx + 1)
+      }
+    })
+  }
+
+  Slide(1)
+}
 
 
-const Manager = new THREE.LoadingManager();
+const Manager = new THREE.LoadingManager(StartAnimation);
 const Draco = new DRACOLoader(Manager)
 const GLB = new GLTFLoader(Manager)
 const Texture = new TextureLoader(Manager)
@@ -50,25 +95,33 @@ GLB.setDRACOLoader(Draco)
 const Raycaster = new THREE.Raycaster()
 
 
-
+const nav = document.querySelector('nav')
+const indicators = []
 const Images = 5
 const Planes = new Group()
 scene.add(Planes)
 
 for(let i = 1; i <= Images; i++){
   const texture = LoadTexture(`/images/${i}.jpg`,Texture)
-  // const material = new THREE.MeshBasicMaterial({
-  //   // color:0x111111,
-  //   map:texture,
-  //   opacity:.4
-  // })
+  
+
+  const indicator = document.createElement('div')
+  const line = document.createElement('div')
+  line.classList.add('line')
+  indicator.classList.add('indicator')
+  indicator.appendChild(line)
+  indicators.push(indicator)
+  nav.appendChild(indicator)
+
+  gsap.set(line,{scaleX:0})
+
   const material = new THREE.ShaderMaterial({
     fragmentShader,
     vertexShader,
     uniforms:{
       uTime:{value:0},
       uTexture:{value:texture},
-      uResolution:{value:3/1000}
+      uResolution:{value:0}
     }
   })
   
@@ -114,34 +167,9 @@ function resize(){
   renderer.setSize(innerWidth,innerHeight)
 }
 
-const mouse = new Vector2()
 function mouseMove(e){
   const x = e.clientX / innerWidth;
   const y = e.clientY / innerHeight;
-
-  const nx = x * 2 - 1;
-  const ny = -(y * 2 - 1);
-
-  mouse.set(nx,ny)
-
-  Raycaster.setFromCamera(mouse,camera)
-  const intersect = Raycaster.intersectObjects(Planes.children)?.[0]?.object?.name || ''
-
-  Planes.children.forEach(child => {
-    if(child.name == intersect) {
-      // child.userData.targetResolution = 3/1000
-      gsap.to(child.material.uniforms.uResolution,{
-        value:1,
-        ease:'power4.out'
-      })
-    } else {
-      gsap.to(child.material.uniforms.uResolution,{
-        value:3/1000,
-        ease:'power4.in'
-      })
-    }
-  })
-
 
   gsap.to(Planes.rotation,{
     y:(2 - x * 1.5) * .3,
